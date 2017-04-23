@@ -1,0 +1,4 @@
+﻿  my_assembler.c
+c:\users\hyejeong\documents\chj\2017\system programming\#4\sic_xe_assembler\sic_xe_assembler\my_assembler.c(269): warning C4018: '<': signed 또는 unsigned가 일치하지 않습니다.
+  SIC_XE_Assembler.vcxproj -> C:\Users\HyeJeong\Documents\CHJ\2017\System Programming\#4\SIC_XE_Assembler\Debug\SIC_XE_Assembler.exe
+  SIC_XE_Assembler.vcxproj -> C:\Users\HyeJeong\Documents\CHJ\2017\System Programming\#4\SIC_XE_Assembler\Debug\SIC_XE_Assembler.pdb (Partial PDB)
