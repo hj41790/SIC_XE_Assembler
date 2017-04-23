@@ -15,12 +15,20 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="my_assembler.c">
+    <None Include="dir.data">
+      <Filter>소스 파일</Filter>
+    </None>
+    <None Include="inst.data">
+      <Filter>소스 파일</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="my_assembler_144.c">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="my_assembler.h">
+    <ClInclude Include="my_assembler_144.h">
       <Filter>소스 파일</Filter>
     </ClInclude>
   </ItemGroup>

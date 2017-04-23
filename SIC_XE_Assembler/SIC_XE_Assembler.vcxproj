@@ -19,10 +19,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="my_assembler.c" />
+    <None Include="dir.data" />
+    <None Include="inst.data" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="my_assembler.h" />
+    <ClCompile Include="my_assembler_144.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="my_assembler_144.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{836FC2BA-C34D-4E29-9732-461898B5805C}</ProjectGuid>

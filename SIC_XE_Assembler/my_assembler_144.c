@@ -16,7 +16,7 @@
 #include <string.h>
 #include <fcntl.h>
 
-#include "my_assembler.h"
+#include "my_assembler_144.h"
 
 #pragma warning(disable:4996)
 
@@ -36,7 +36,7 @@ int main(int args, char *arg[])
 		return -1 ; 
 	}
 
-	make_opcode_output("output_144.txt");
+//	make_opcode_output("output_144.txt");
 
 	
 	/* 
@@ -53,6 +53,9 @@ int main(int args, char *arg[])
 
 	make_objectcode_output("output") ; 
 	*/
+
+	system("pause");
+
 	return 0;
 }
 
@@ -217,6 +220,11 @@ int init_input_file(char *input_file)
 
 	token_line = 0;
 	line_num = 0;
+	section_line = 0;
+	cur_section = 0;
+	literal_line = 0;
+	symbol_line = 0;
+
 	if((file = fopen(input_file, "r"))==NULL) {
 		errnum = -1;
 	}
@@ -263,6 +271,12 @@ int token_parsing(int index)
 	token *unit = (token*)malloc(sizeof(token));
 	memset(unit, 0, sizeof(token));
 
+	unit->addr = locctr;
+	unit->section = section_line;
+
+
+	// 토큰을 테이블에 등록
+	token_table[token_line++] = unit;
 
 	// 1. 라인 전체가 주석인가? ( 첫 글자가 '.' 으로 시작)
 	int i;
@@ -272,7 +286,6 @@ int token_parsing(int index)
 	if(input_data[index][i]=='.'){			// 주석인 경우
 		unit->comment = input_data[index];	// 라인 전체를 comment에 등록
 		unit->optype = TYPE_COMMENT;		// 토큰 타입을 주석으로 설정
-		token_table[token_line++] = unit;	// 토큰 테이블에 등록 후 반환
 		return result;
 	}
 
@@ -323,16 +336,16 @@ int token_parsing(int index)
 		unit->comment = strtok(NULL, "\n");	// comment
 
 		// Operand Parsing
-		token_operand = strtok(token_next, ",");
-		if(token_operand==NULL){
+		if(token_next==NULL){
 			// 피연산자가 있어야 하는데 없는 경우
 			result = -1;
 			return result;
 		}
-		else{
+		else {
 
-			// 둘 이상의 피연산자의 경우 공백 없이 ',' 으로 연결된 
+			// 명령어일때 둘 이상의 피연산자의 경우 공백 없이 ',' 으로 연결된 
 			// 하나의 토큰으로 가정하고 파싱한다.
+			token_operand = strtok(token_next, ",");
 			unit->operand[0] = token_operand;
 
 			int i;
@@ -349,8 +362,289 @@ int token_parsing(int index)
 		unit->comment = strtok(NULL, "\n");
 	}
 
-	// 파싱 완료한 토큰을 테이블에 등록
-	token_table[token_line++] = unit;
+
+	/* directive 수행 및 symbol table 등록 */
+
+	if (unit->optype == TYPE_DIRECTIVE && execute_directive(unit)<0) {
+		return -1;
+	}
+
+	if (unit->label != NULL) {
+		// sybol table search and register
+	}
+
+
+	/* location counter 계산 */
+
+
+
+
+
+	return result;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+int execute_directive(token *unit) 
+{
+	if (unit->optype != TYPE_DIRECTIVE) return -1;
+
+	if (unit->opindex == 0) {
+		// START
+
+		section *sect = (section *)malloc(sizeof(section));
+		memset(sect, 0, sizeof(section));
+		sect->name = unit->label;
+		section_table[section_line] = sect;
+
+		locctr = start_addr = atoi(unit->operand[0]);
+	}
+	else if (unit->opindex == 1) {	
+		//EXTDEF
+		int i, index;
+		for (i = 0; unit->operand[i] != NULL; i++) {
+			if ((index=search_globalSymbol(unit->label))<0) {
+				int index = add_symbol_table(unit, F_EXTDEF);
+			}
+			else if (symbol_table[index]->flag & F_EXTREF) {
+				// 외부 section에서 EXTREF에 사용한 경우 플래그만 변경
+				symbol_table[index]->flag &= F_EXTDEF;
+			}
+			else return -1;
+		}
+	}
+	else if (unit->opindex == 2) {
+		//EXTREF
+		int i, index;
+		for (i = 0; unit->operand[i] != NULL; i++) {
+			if ((index=search_globalSymbol(unit->label))<0) {
+				int index = add_symbol_table(unit, F_EXTREF);
+			}
+			else if (symbol_table[index]->flag & F_EXTDEF) {
+				// 외부에서 EXTDEF로 선언된 경우 REF로 바꿔줌
+				symbol_table[index]->flag &= (F_EXTREF|(symbol_table[index]->flag & F_EXIST));
+			}
+		}
+	}
+	else if (unit->opindex == 3) {
+		// RESW
+		int index;
+
+		if ((index = search_globalSymbol(unit->label)) >= 0) {
+			
+			// EXTDEF 의 경우에만 선언 가능
+			if (symbol_table[index]->flag & F_EXTDEF && !(symbol_table[index]->flag & F_EXIST)) {
+				symbol_table[index]->addr = unit->addr;
+				symbol_table[index]->section = unit->section;
+				symbol_table[index]->flag |= F_EXIST;
+			}
+			else return -1;
+		}
+		else if (search_localSymbol(unit->label, unit->section) < 0) {
+			add_symbol_table(unit, F_EXIST);
+		}
+		else 
+			return -1;
+
+		// location counter calculation
+		locctr += 3 * atoi(unit->operand[0]);
+	}
+	else if (unit->opindex == 4) {
+		// RESB
+		int index;
+
+		if ((index = search_globalSymbol(unit->label)) >= 0) {
+
+			// EXTDEF 의 경우에만 선언 가능
+			if (symbol_table[index]->flag & F_EXTDEF && !(symbol_table[index]->flag & F_EXIST)) {
+				symbol_table[index]->addr = unit->addr;
+				symbol_table[index]->section = unit->section;
+				symbol_table[index]->flag |= F_EXIST;
+			}
+			else return -1;
+		}
+		else if (search_localSymbol(unit->label, unit->section) < 0) {
+			add_symbol_table(unit, F_EXIST);
+		}
+		else
+			return -1;
+
+		// location counter calculation
+		locctr += atoi(unit->operand[0]);
+	}
+	else if (unit->opindex == 5) {
+		// BYTE
+		
+		char *value = unit->operand[0];
+		int *val;
+		int index;
+
+		if ((index = search_globalSymbol(unit->label)) >= 0) {
+
+			// EXTDEF symbol & no definition
+			if ((symbol_table[index]->flag & F_EXTDEF) && !(symbol_table[index]->flag & F_EXIST)){
+				symbol_table[index]->addr = unit->addr;
+				symbol_table[index]->section = unit->section;
+				symbol_table[index]->flag |= F_EXIST;
+			}
+			else return -1;
+
+		}
+		else if (search_localSymbol(unit->label, unit->section) < 0) {
+			add_symbol_table(unit, F_EXIST);
+		}
+		else
+			return -1;
+
+		if (value[0] == 'c' || value[0] == 'C') {
+			int length = strlen(value);
+			val = (int*)malloc(sizeof(int)*(length - 2));
+
+			int i;
+			for (i = 2; i < length - 1; i++)
+				val[i - 2] = value[i];
+			val[sizeof(val) - 1] = '\0';
+
+			locctr += strlen(val);
+
+		}
+		else if (value[0] == 'x' || value[0] == 'X') {
+			val = (int*)malloc(3 * sizeof(int));
+			val[0] = value[2];
+			val[1] = value[3];
+			val[2] = '\0';
+
+			locctr++;
+		}
+
+		unit->value = val;
+
+	}
+	else if (unit->opindex == 6) {
+		// WORD
+	
+	}
+	else if (unit->opindex == 7) {
+		// LTORG
+
+	}
+	else if (unit->opindex == 8) {
+		// EQU
+
+		add_symbol_table(unit, F_EQU);
+
+		if (strcmp(unit->operand[0], "*") == 0) {
+			symbol_table[symbol_line - 1] = locctr;
+		}
+
+	}
+	else if (unit->opindex == 9) {}
+	else if (unit->opindex == 11) {
+		//CSECT
+		section *sect = (section*)malloc(sizeof(section));
+		memset(sect, 0, sizeof(section));
+
+		section_table[section_line]->length = locctr - start_addr;
+
+		locctr = start_addr = 0;
+		sect->name = unit->label;
+		section_table[++section_line] = sect;
+
+	}
+	else if (unit->opindex == 12) {}
+	else if (unit->opindex == 13) {
+		//END
+
+		// LTORG + last section
+
+
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+int add_symbol_table(token *unit, int flag) {
+
+	int result = -1;
+
+	if (search_localSymbol(unit->label, unit->section) < 0) {
+
+		symbol *sym = (symbol*)malloc(sizeof(symbol));
+		memset(sym, 0, sizeof(symbol));
+
+		strcpy(sym->symbol, unit->label);
+		sym->flag = flag;
+		sym->section = unit->section;
+		sym->addr = unit->addr;
+
+		symbol_table[symbol_line++] = sym;
+		result = symbol_line - 1;
+	}
+
+	return result;
+}
+
+
+int search_localSymbol(char *str, int section)
+{
+	int i;
+	int result = -1;
+
+	if (str == NULL) return -1;
+	
+	for (i = 0; i < symbol_line; i++) {
+		if (strcmp(str, symbol_table[i]->symbol) == 0
+					&& section == symbol_table[i]->section) {
+
+			// same section
+			result = i;
+			break;
+		}
+	}
+
+	return result;
+}
+
+int search_globalSymbol(char *str)
+{
+	int i;
+	int result = -1;
+
+	if (str == NULL) return -1;
+
+	for (i = 0; i < symbol_line; i++) {
+		if (strcmp(str, symbol_table[i]->symbol) == 0 
+					&& (symbol_table[i]->flag & (F_EXTDEF|F_EXTREF))) {
+
+			// extern value
+			result = i;
+			break;
+		}
+	}
 
 	return result;
 }
@@ -526,6 +820,18 @@ void make_opcode_output(char *file_name)
 static int assem_pass1(void)
 {
 	/* add your code here */
+
+	int i;
+
+	for (i = 0; i < line_num; i++) {
+
+		// 해당 라인을 토큰으로 파싱
+		if (token_parsing(i)<0) {
+			printf("parsing error\n");
+			break;
+		}
+	
+	}
 
 }
 

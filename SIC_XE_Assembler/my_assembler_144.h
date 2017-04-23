@@ -11,6 +11,18 @@
 #define TYPE_DIRECTIVE		1
 #define TYPE_COMMENT		2
 
+#define BIT_N	(1<<5)
+#define BIT_I	(1<<4)
+#define BIT_X	(1<<3)
+#define BIT_B	(1<<2)
+#define BIT_P	(1<<1)
+#define BIT_E	1
+
+#define F_EXTDEF	1
+#define F_EXTREF	(1<<1)
+#define F_EQU		(1<<2)
+#define F_EXIST		(1<<3)
+
 /* 
  * instruction 목록 파일로 부터 정보를 받아와서 생성하는 구조체 변수이다.
  * 구조는 각자의 instruction set의 양식에 맞춰 직접 구현하되
@@ -49,7 +61,6 @@ int dir_index;
 char *input_data[MAX_LINES];
 static int line_num;
 
-int label_num; 
 
 /* 
  * 어셈블리 할 소스코드를 토큰단위로 관리하기 위한 구조체 변수이다.
@@ -61,10 +72,13 @@ struct token_unit {
 	char *operator; 
 	char *operand[MAX_OPERAND];
 	char *comment;
+	int *value;
+	int	addr;
+	char section;
+	char nixbpe;
 	char opindex;	// operator와 일치하는 테이블 인덱스 저장
 	char optype;	// 토큰의 타입을 저장하여 보다 편하게 관리
 					// 위의 TYPE으로 시작하는 전처리문을 참고하여 값 설정
-	//char nixbpe; // 추후 프로젝트에서 사용된다.
 	
 };
 
@@ -78,13 +92,43 @@ static int token_line;
  */
 struct symbol_unit {
 	char symbol[10];
+	char flag;
+	int section;
 	int addr;
+	int value;
 };
 
 typedef struct symbol_unit symbol;
-symbol sym_table[MAX_LINES];
+symbol *symbol_table[MAX_LINES];
+static int symbol_line;
+
+/*
+ * 리터럴을 관리하는 구조체
+ * 리터럴의 이름, 값, 길이, 위치로 구성된다.
+ */
+
+struct literal_unit {
+	char* name;
+	char* value;
+	int length;
+	int addr;
+};
+
+typedef struct literal_unit lit;
+lit *literal_table[MAX_LINES];
+static int literal_line;
+
+struct section_unit {
+	char* name;
+	int length;
+};
+typedef struct section_unit section;
+section *section_table[MAX_LINES];
+static int section_line;
+static int cur_section;
 
 static int locctr;
+static int start_addr;
 //--------------
 
 static char *input_file;
