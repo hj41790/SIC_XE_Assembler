@@ -2,14 +2,16 @@
  * my_assembler 함수를 위한 변수 선언 및 매크로를 담고 있는 헤더 파일이다. 
  * 
  */
-#define MAX_INST 256
-#define MAX_LINES 5000
-#define MAX_OPERAND 3
-#define MAX_DIRECTIVE 32
+#define MAX_INST		256
+#define MAX_LINES		5000
+#define MAX_OPERAND		3
+#define MAX_DIRECTIVE	32
+#define MAX_REGISTER	9
 
 #define TYPE_INSTRUCTION	0
 #define TYPE_DIRECTIVE		1
 #define TYPE_COMMENT		2
+#define TYPE_LITERAL		3
 
 #define BIT_N	(1<<5)
 #define BIT_I	(1<<4)
@@ -18,10 +20,12 @@
 #define BIT_P	(1<<1)
 #define BIT_E	1
 
-#define F_EXTDEF	1
-#define F_EXTREF	(1<<1)
+//#define F_LITERAL	1
+#define F_EXTDEF	(1<<1)
 #define F_EQU		(1<<2)
 #define F_EXIST		(1<<3)
+
+char *reg_table[9] = {"A", "X", "L", "B", "S", "T", "F", "PC", "SW"};
 
 /* 
  * instruction 목록 파일로 부터 정보를 받아와서 생성하는 구조체 변수이다.
@@ -72,7 +76,7 @@ struct token_unit {
 	char *operator; 
 	char *operand[MAX_OPERAND];
 	char *comment;
-	int *value;
+	char *code;
 	int	addr;
 	char section;
 	char nixbpe;
@@ -95,7 +99,7 @@ struct symbol_unit {
 	char flag;
 	int section;
 	int addr;
-	int value;
+	int refSection;
 };
 
 typedef struct symbol_unit symbol;
@@ -109,7 +113,7 @@ static int symbol_line;
 
 struct literal_unit {
 	char* name;
-	char* value;
+	int section;
 	int length;
 	int addr;
 };
@@ -118,17 +122,41 @@ typedef struct literal_unit lit;
 lit *literal_table[MAX_LINES];
 static int literal_line;
 
+/*
+* 섹션 정보를 관리하는 구조체
+* 섹션의 이름, 길이로 구성된다.
+*/
 struct section_unit {
 	char* name;
 	int length;
 };
+
 typedef struct section_unit section;
 section *section_table[MAX_LINES];
 static int section_line;
 static int cur_section;
 
+/*
+* M record를 관리하는 구조체
+* 섹션번호, 수정할 위치, 길이, +/-, 
+* 심볼 인덱스, 토큰 인덱스로 구성된다.
+*/
+struct modification_unit {
+	int section;
+	int location;
+	int length;
+	int operation;
+	int symbol_index;
+	int token_index;
+};
+typedef struct modification_unit modification;
+modification *modify_table[MAX_LINES];
+static int modify_line;
+
+
 static int locctr;
 static int start_addr;
+static int return_addr;
 //--------------
 
 static char *input_file;
@@ -137,6 +165,21 @@ int init_my_assembler(void);
 int init_inst_file(char *inst_file);
 int init_dir_file(char *dir_file);
 int init_input_file(char *input_file);
+
+int token_parsing(int index);
+int make_machine_code(int token_index);
+int execute_directive(token *unit);
+int charToHex(char ch);
+int isExpression(char *str);
+int isNumeric(char *str);
+void execute_LTORG();
+int add_literal_table(char *operand);
+int add_symbol_table(char *str, token *unit, int flag);
+int search_register(char *str);
+int search_literal(char *str, int section);
+int search_localSymbol(char *str, int section);
+int search_globalSymbol(char *str);
+
 int search_opcode(char *str);
 int search_directive(char *str);
 void make_opcode_output(char *file_name);
